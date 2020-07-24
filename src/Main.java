@@ -19,6 +19,9 @@ public class Main {
     private static final String listNumberPrefix = "item-extended-phone";
     private static final String bigNumberPrefix = "<div class=\"item-phone-big-number";
 
+    private static final int height = 1400;
+    private static final int width = 2100;
+
     public static void main(String[] args) throws IOException, InterruptedException {
 
         if (args.length == 1 && args[0].equals("-man")) {
@@ -39,9 +42,12 @@ public class Main {
                 return;
             }
         }
+        var headlessOptions = new ChromeOptions();
+        headlessOptions.addArguments("--headless");
+        headlessOptions.addArguments("window-size=" + height + "," + width);
 
-	    ChromeDriver driver = new ChromeDriver();
-        ChromeDriver imageDriver = new ChromeDriver();
+	    ChromeDriver driver = new ChromeDriver(headlessOptions);
+        ChromeDriver imageDriver = new ChromeDriver(headlessOptions);
         Actions action = new Actions(driver);
 	    try {
             driver.get(inputUrl);
@@ -102,7 +108,7 @@ public class Main {
                 Point location = number.getLocation();
                 BufferedImage bufferedImage = ImageIO.read(screenshot);
                 bufferedImage = bufferedImage.getSubimage(location.x, location.y, width, height);
-                File outputfile = new File("number.png");
+                File outputfile = new File("../number.png");
                 ImageIO.write(bufferedImage, "png", outputfile);
 
                 ProcessBuilder builder = new ProcessBuilder("bash", "-c", "tesseract ./number.png stdout 2>/dev/null\n");
