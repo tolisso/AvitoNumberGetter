@@ -19,8 +19,17 @@ or
 
 `sudo apt-get install tesseract-ocr`
 
-
 Also you need to have **chrome** and **selenium plugin to chrome**.
+
+## Build
+
+To build project you need to add additional modules to it. 
+They are locating in packages
+
+*plugins/selenium-java-@version* and 
+
+*plugins/selenium-java-@version/libs*
+
 ## How to use
 
 Launch with arguments: (link), (numberOfLinks-opt)
