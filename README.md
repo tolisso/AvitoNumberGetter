@@ -32,11 +32,15 @@ They are locating in packages
 
 ## How to use
 
-Launch with arguments: (link), (numberOfLinks-opt)
+Launch with arguments: 
+1) -link (link)
+2) -page (link) (numberOfLinks-opt)
+3) -pages (link) (numberOfPages)
 
-(link) may point to
-* list of a housings WITH NUMBERS
-* page with one housing
+(link) must point to
+1) housing page
+2) page with list of housings
+3) first page with list of housings
 
 (numberOfLinks-opt) set how many links from beginning 
 of list of a housings WITH NUMBERS will be loaded. 
