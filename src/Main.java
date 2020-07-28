@@ -1,16 +1,19 @@
+import org.joox.JOOX;
+import org.joox.Match;
 import org.openqa.selenium.*;
 import org.openqa.selenium.Point;
 import org.openqa.selenium.chrome.*;
 import org.openqa.selenium.interactions.Actions;
+import org.xml.sax.SAXException;
 
 import javax.imageio.ImageIO;
+import javax.xml.xpath.XPath;
 import java.awt.*;
 import java.awt.image.*;
 import java.io.*;
 import java.util.*;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
-import java.util.ArrayList.*;
 
 
 public class Main {
@@ -70,12 +73,39 @@ public class Main {
                 } else {
                     driver.get(inputUrl);
                 }
-                parsePage(driver, imageDriver, action);
+                parseHtml(driver.getPageSource());
+//                parsePage(driver, imageDriver, action);
             }
         } finally {
             driver.close();
             imageDriver.close();
         }
+    }
+
+    private static void parseHtml(String html) throws IOException {
+        File file = new File("scammed.html");
+        file.delete();
+        file.createNewFile();
+        FileWriter writer = new FileWriter(file);
+        writer.write(html);
+        writer.close();
+        workWithLocalVersion(file);
+//        try {
+//            System.out.println(html.substring(0, 100000));
+//            Match $html = (Match) JOOX.builder().parse(html);
+//            System.out.println($html.xpath("//*[contains(text(), \'Показать телефон\')]").each());
+//        } catch (Exception exc) {
+//            System.err.println(exc);
+//        }
+    }
+
+    private static void workWithLocalVersion(File file) {
+        ChromeOptions disableJavascript = new ChromeOptions();
+//        disableJavascript.addArguments("--disable-javascript");
+        ChromeDriver localDriver = new ChromeDriver(disableJavascript);
+        System.out.println(file.getAbsolutePath());
+        localDriver.get(file.getAbsolutePath());
+        System.out.println(localDriver.findElementsByXPath("//*[contains(text(), \'Показать телефон\')]").size());
     }
 
     private static void parsePage(ChromeDriver driver, ChromeDriver imageDriver, Actions action) throws InterruptedException, IOException {
