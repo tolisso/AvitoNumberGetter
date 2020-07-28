@@ -1,13 +1,9 @@
-import org.joox.JOOX;
-import org.joox.Match;
 import org.openqa.selenium.*;
 import org.openqa.selenium.Point;
 import org.openqa.selenium.chrome.*;
 import org.openqa.selenium.interactions.Actions;
-import org.xml.sax.SAXException;
 
 import javax.imageio.ImageIO;
-import javax.xml.xpath.XPath;
 import java.awt.*;
 import java.awt.image.*;
 import java.io.*;
@@ -18,7 +14,7 @@ import java.util.concurrent.TimeUnit;
 
 public class Main {
 
-    private static Integer numberOfHousings = 2; //Integer.MAX_VALUE;
+    private static Integer numberOfHousings = 3; //Integer.MAX_VALUE;
     private static Integer numberOfPages = 1;
     private static String inputUrl;
     private static final String listNumberPrefix = "item-extended-phone";
@@ -58,12 +54,14 @@ public class Main {
                 }
             }
         }
+
+
         var headlessOptions = new ChromeOptions();
         headlessOptions.addArguments("--headless");
         headlessOptions.addArguments("window-size=" + height + "," + width);
 
-//	    ChromeDriver driver = new ChromeDriver(headlessOptions);
-        ChromeDriver driver = new ChromeDriver();
+        ChromeDriver driver = new ChromeDriver(headlessOptions);
+//        ChromeDriver driver = new ChromeDriver();
         ChromeDriver imageDriver = new ChromeDriver(headlessOptions);
         Actions action = new Actions(driver);
         try {
@@ -73,8 +71,9 @@ public class Main {
                 } else {
                     driver.get(inputUrl);
                 }
-                parseHtml(driver.getPageSource());
-//                parsePage(driver, imageDriver, action);
+                var ids = parseIds(driver.getPageSource());
+//                parseHtml(driver.getPageSource());
+                parsePage(driver, imageDriver, action, ids);
             }
         } finally {
             driver.close();
@@ -82,14 +81,17 @@ public class Main {
         }
     }
 
-    private static void parseHtml(String html) throws IOException {
-        File file = new File("scammed.html");
-        file.delete();
-        file.createNewFile();
-        FileWriter writer = new FileWriter(file);
-        writer.write(html);
-        writer.close();
-        workWithLocalVersion(file);
+    private static List<String> parseIds(String html) throws IOException {
+//        File file = File.createTempFile("scam", ".html");
+        File file = new File("scammed1.html");
+        try {
+            FileWriter writer = new FileWriter(file);
+            writer.write(html);
+            writer.close();
+            return workWithLocalVersion(file);
+        } finally {
+//            file.deleteOnExit();
+        }
 //        try {
 //            System.out.println(html.substring(0, 100000));
 //            Match $html = (Match) JOOX.builder().parse(html);
@@ -99,17 +101,57 @@ public class Main {
 //        }
     }
 
-    private static void workWithLocalVersion(File file) {
-        ChromeOptions disableJavascript = new ChromeOptions();
-//        disableJavascript.addArguments("--disable-javascript");
-        ChromeDriver localDriver = new ChromeDriver(disableJavascript);
-        System.out.println(file.getAbsolutePath());
-        localDriver.get(file.getAbsolutePath());
-        System.out.println(localDriver.findElementsByXPath("//*[contains(text(), \'Показать телефон\')]").size());
+    private static List<String> workWithLocalVersion(File file) {
+//        System.setProperty("webdriver.firefox.driver", "/home/tolisso/Programming/drivers/geckodriver");
+//
+//        FirefoxOptions options = new FirefoxOptions();
+//        options.addPreference("javascript.enabled", false);
+        ChromeOptions options = new ChromeOptions();
+
+        WebDriver localDriver = new ChromeDriver(options);
+
+        localDriver.get("file://" + file.getAbsolutePath());
+        JavascriptExecutor js = (JavascriptExecutor) localDriver;
+
+        List<String> ids = new ArrayList<>();
+        for (int i = 0; i < numberOfHousings; i++) {
+            try {
+                System.out.println(js.executeScript("    let node = document.evaluate(\"//*[contains(text(), \\'Показать телефон\\')]\",\n" +
+                        "        document,\n" +
+                        "        null,\n" +
+                        "        XPathResult.FIRST_ORDERED_NODE_TYPE,\n" +
+                        "        null).singleNodeValue;\n" +
+                        "\n" +
+                        "    let result = [];\n" +
+                        "    function find_son(father, son) {\n" +
+                        "        const children = father.children();\n" +
+                        "        for (let i = 0; i < children.length; i++) {\n" +
+                        "            if (children[i] === father) {\n" +
+                        "                return i;\n" +
+                        "            }\n" +
+                        "        }\n" +
+                        "    }\n" +
+                        "\n" +
+                        "    while (true) {\n" +
+                        "        result.push(node.name);\n" +
+                        "        if (node.name === \"html\") {\n" +
+                        "            break;\n" +
+                        "        }\n" +
+                        "        result[result.length - 1] = result[result.length - 1] + \"[\" + find_son(node.parentNode, node) + \"]\";\n" +
+                        "    }\n" +
+                        "    return result;\n").toString());
+            } catch (Exception exc) {
+                break;
+            }
+        }
+        return ids;
     }
 
-    private static void parsePage(ChromeDriver driver, ChromeDriver imageDriver, Actions action) throws InterruptedException, IOException {
-        var buttonsConst = driver.findElementsByXPath("//*[contains(text(), \'Показать телефон\')]");
+    private static void parsePage(ChromeDriver driver, ChromeDriver imageDriver, Actions action, List<String> ids) throws InterruptedException, IOException {
+        var buttonsConst = new ArrayList<WebElement>();
+        for (var id : ids) { // ids is empty!
+            buttonsConst.add(driver.findElementByXPath(id));
+        }
         var buttons = new ArrayList<WebElement>();
         for (int i = 0; i < Math.min(buttonsConst.size(), numberOfPages); i++) {
             if (buttonsConst.get(i).isDisplayed()) {
@@ -165,7 +207,7 @@ public class Main {
             Point location = number.getLocation();
             BufferedImage bufferedImage = ImageIO.read(screenshot);
             bufferedImage = bufferedImage.getSubimage(location.x, location.y, width, height);
-            File outputfile = new File("../number.png");
+            File outputfile = new File("number.png");
             ImageIO.write(bufferedImage, "png", outputfile);
 
             ProcessBuilder builder = new ProcessBuilder("bash", "-c", "tesseract ./number.png stdout 2>/dev/null\n");
