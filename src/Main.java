@@ -11,7 +11,6 @@ import java.util.*;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 
-
 public class Main {
 
     private static Integer numberOfHousings = 3; //Integer.MAX_VALUE;
@@ -25,7 +24,6 @@ public class Main {
     private static final int width = 2100;
 
     public static void main(String[] args) throws IOException, InterruptedException {
-
         if (args.length < 2) {
             System.err.println("too few arguments");
         } else {
@@ -55,13 +53,15 @@ public class Main {
             }
         }
 
+//        File file = new File("scammed1.html");
+//        workWithLocalVersion(file);
 
         var headlessOptions = new ChromeOptions();
         headlessOptions.addArguments("--headless");
         headlessOptions.addArguments("window-size=" + height + "," + width);
 
-        ChromeDriver driver = new ChromeDriver(headlessOptions);
-//        ChromeDriver driver = new ChromeDriver();
+//        ChromeDriver driver = new ChromeDriver(headlessOptions);
+        ChromeDriver driver = new ChromeDriver();
         ChromeDriver imageDriver = new ChromeDriver(headlessOptions);
         Actions action = new Actions(driver);
         try {
@@ -71,9 +71,9 @@ public class Main {
                 } else {
                     driver.get(inputUrl);
                 }
-                var ids = parseIds(driver.getPageSource());
+                var xpathList = parseButtonsXpath(driver.getPageSource());
 //                parseHtml(driver.getPageSource());
-                parsePage(driver, imageDriver, action, ids);
+                parsePage(driver, imageDriver, action, xpathList);
             }
         } finally {
             driver.close();
@@ -81,16 +81,16 @@ public class Main {
         }
     }
 
-    private static List<String> parseIds(String html) throws IOException {
+    private static List<String> parseButtonsXpath(String html) throws IOException {
 //        File file = File.createTempFile("scam", ".html");
-        File file = new File("scammed1.html");
+        File file = File.createTempFile("scammed", ".html");
         try {
             FileWriter writer = new FileWriter(file);
             writer.write(html);
             writer.close();
             return workWithLocalVersion(file);
         } finally {
-//            file.deleteOnExit();
+            file.deleteOnExit();
         }
 //        try {
 //            System.out.println(html.substring(0, 100000));
@@ -109,51 +109,67 @@ public class Main {
         ChromeOptions options = new ChromeOptions();
 
         WebDriver localDriver = new ChromeDriver(options);
+        try {
+            localDriver.get("file://" + file.getAbsolutePath());
+            JavascriptExecutor js = (JavascriptExecutor) localDriver;
 
-        localDriver.get("file://" + file.getAbsolutePath());
-        JavascriptExecutor js = (JavascriptExecutor) localDriver;
-
-        List<String> ids = new ArrayList<>();
-        for (int i = 0; i < numberOfHousings; i++) {
-            try {
-                System.out.println(js.executeScript("    let node = document.evaluate(\"//*[contains(text(), \\'Показать телефон\\')]\",\n" +
+            List<String> xpathList = new ArrayList<>();
+            for (int i = 0;; i++) {
+                Object xpath = js.executeScript("let node = document.evaluate(\"//*[contains(text(), \\'Показать телефон\\')]\",\n" +
                         "        document,\n" +
                         "        null,\n" +
                         "        XPathResult.FIRST_ORDERED_NODE_TYPE,\n" +
                         "        null).singleNodeValue;\n" +
                         "\n" +
-                        "    let result = [];\n" +
-                        "    function find_son(father, son) {\n" +
-                        "        const children = father.children();\n" +
-                        "        for (let i = 0; i < children.length; i++) {\n" +
-                        "            if (children[i] === father) {\n" +
-                        "                return i;\n" +
-                        "            }\n" +
+                        "if (node === null) return null;\n" +
+                        "node.textContent = \"scammed\";\n" +
+                        "let result = [];\n" +
+                        "function chose_by_nodeName(node_array, name) {\n" +
+                        "    let ans = [];\n" +
+                        "    for (let node of node_array) {\n" +
+                        "        if (node.nodeName === name) {\n" +
+                        "            ans.push(node);\n" +
                         "        }\n" +
                         "    }\n" +
-                        "\n" +
-                        "    while (true) {\n" +
-                        "        result.push(node.name);\n" +
-                        "        if (node.name === \"html\") {\n" +
-                        "            break;\n" +
+                        "    return ans;\n" +
+                        "}\n" +
+                        "function find_son(father, son) {\n" +
+                        "    const children = chose_by_nodeName(father.childNodes, son.nodeName);\n" +
+                        "    for (let i = 0; i < children.length; i++) {\n" +
+                        "        if (children[i] === son) {\n" +
+                        "            return i;\n" +
                         "        }\n" +
-                        "        result[result.length - 1] = result[result.length - 1] + \"[\" + find_son(node.parentNode, node) + \"]\";\n" +
                         "    }\n" +
-                        "    return result;\n").toString());
-            } catch (Exception exc) {
-                break;
+                        "}\n" +
+                        "while (true) {\n" +
+                        "    if (node.nodeName === \"HTML\") {\n" +
+                        "        result.push(\"html\");\n" +
+                        "        break;\n" +
+                        "    }\n" +
+                        "    result.push(node.nodeName.toLowerCase());\n" +
+                        "    result[result.length - 1] = result[result.length - 1] + \"[\" + (find_son(node.parentNode, node) + 1) + \"]\";\n" +
+                        "    node = node.parentNode\n" +
+                        "}\n" +
+                        "return '/' + result.reverse().join(\"/\");");
+
+                if (xpath == null) {
+                    break;
+                }
+                xpathList.add((String)xpath);
             }
+            return xpathList;
+        } finally {
+            localDriver.close();
         }
-        return ids;
     }
 
-    private static void parsePage(ChromeDriver driver, ChromeDriver imageDriver, Actions action, List<String> ids) throws InterruptedException, IOException {
+    private static void parsePage(ChromeDriver driver, ChromeDriver imageDriver, Actions action, List<String> xpathList) throws InterruptedException, IOException {
         var buttonsConst = new ArrayList<WebElement>();
-        for (var id : ids) { // ids is empty!
-            buttonsConst.add(driver.findElementByXPath(id));
+        for (var xpath : xpathList) {
+            buttonsConst.add(driver.findElementByXPath(xpath));
         }
         var buttons = new ArrayList<WebElement>();
-        for (int i = 0; i < Math.min(buttonsConst.size(), numberOfPages); i++) {
+        for (int i = 0; i < Math.min(buttonsConst.size(), numberOfHousings); i++) {
             if (buttonsConst.get(i).isDisplayed()) {
                 buttons.add(buttonsConst.get(i));
             }
