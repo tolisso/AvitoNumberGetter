@@ -13,7 +13,9 @@ import java.util.concurrent.TimeUnit;
 
 public class Main {
 
-    private static Integer numberOfHousings = 3; //Integer.MAX_VALUE;
+    private static final boolean DEBUG = true;
+
+    private static Integer numberOfHousings = 6; //Integer.MAX_VALUE;
     private static Integer numberOfPages = 1;
     private static String inputUrl;
     private static final String listNumberPrefix = "item-extended-phone";
@@ -76,8 +78,10 @@ public class Main {
                 parsePage(driver, imageDriver, action, xpathList);
             }
         } finally {
-            driver.close();
-            imageDriver.close();
+            if (!DEBUG) {
+                driver.close();
+                imageDriver.close();
+            }
         }
     }
 
@@ -155,11 +159,16 @@ public class Main {
                 if (xpath == null) {
                     break;
                 }
+                if (DEBUG) {
+                    System.out.println(xpath);
+                }
                 xpathList.add((String)xpath);
             }
             return xpathList;
         } finally {
-            localDriver.close();
+            if (!DEBUG) {
+                localDriver.close();
+            }
         }
     }
 
@@ -170,7 +179,7 @@ public class Main {
         }
         var buttons = new ArrayList<WebElement>();
         for (int i = 0; i < Math.min(buttonsConst.size(), numberOfHousings); i++) {
-            if (buttonsConst.get(i).isDisplayed()) {
+            if (buttonsConst.get(i).isEnabled()) {
                 buttons.add(buttonsConst.get(i));
             }
         }
