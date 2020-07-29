@@ -1,4 +1,4 @@
-let node = document.evaluate("//*[contains(text(), \'Показать телефон\')]",
+let node = document.evaluate("//button[contains(text(), \'Показать телефон\')]",
         document,
         null,
         XPathResult.FIRST_ORDERED_NODE_TYPE,

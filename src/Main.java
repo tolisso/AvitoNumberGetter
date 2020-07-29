@@ -13,11 +13,13 @@ import java.util.concurrent.TimeUnit;
 
 public class Main {
 
-    private static final boolean DEBUG = true;
+    private static final boolean DEBUG = false;
+    private static final int DELAY = 7_000; // ms
 
-    private static Integer numberOfHousings = 6; //Integer.MAX_VALUE;
-    private static Integer numberOfPages = 1;
+    private static Integer numberOfHousings = Integer.MAX_VALUE; //Integer.MAX_VALUE;
+    private static Integer numberOfPages = 1; // - default value: DO NOT CHANGE
     private static String inputUrl;
+
     private static final String listNumberPrefix = "item-extended-phone";
     private static final String bigNumberPrefix = "<div class=\"item-phone-big-number";
     private static final List<String> firstArg = List.of("-link", "-page", "-pages");
@@ -30,7 +32,7 @@ public class Main {
             System.err.println("too few arguments");
         } else {
             if (!firstArg.contains(args[0])) {
-                System.out.println("Wrong argument: " + args[0]);
+                System.err.println("Wrong argument: " + args[0]);
                 return;
             }
             inputUrl = args[1];
@@ -58,13 +60,20 @@ public class Main {
 //        File file = new File("scammed1.html");
 //        workWithLocalVersion(file);
 
+        System.setProperty("webdriver.chrome.silentOutput", "true");
+
         var headlessOptions = new ChromeOptions();
         headlessOptions.addArguments("--headless");
         headlessOptions.addArguments("window-size=" + height + "," + width);
-
-//        ChromeDriver driver = new ChromeDriver(headlessOptions);
-        ChromeDriver driver = new ChromeDriver();
-        ChromeDriver imageDriver = new ChromeDriver(headlessOptions);
+        ChromeDriver driver;
+        ChromeDriver imageDriver;
+        if (DEBUG) {
+            driver = new ChromeDriver();
+            imageDriver = new ChromeDriver();
+        } else {
+            driver = new ChromeDriver(headlessOptions);
+            imageDriver = new ChromeDriver(headlessOptions);
+        }
         Actions action = new Actions(driver);
         try {
             for (int page = 1; page <= numberOfPages; page++) {
@@ -105,62 +114,39 @@ public class Main {
 //        }
     }
 
-    private static List<String> workWithLocalVersion(File file) {
+    private static List<String> workWithLocalVersion(File file) throws IOException {
 //        System.setProperty("webdriver.firefox.driver", "/home/tolisso/Programming/drivers/geckodriver");
 //
 //        FirefoxOptions options = new FirefoxOptions();
 //        options.addPreference("javascript.enabled", false);
         ChromeOptions options = new ChromeOptions();
-
-        WebDriver localDriver = new ChromeDriver(options);
+        options.addArguments("--headless");
+        WebDriver localDriver;
+        if (DEBUG) {
+            localDriver = new ChromeDriver();
+        } else {
+            localDriver = new ChromeDriver(options);
+        }
         try {
             localDriver.get("file://" + file.getAbsolutePath());
             JavascriptExecutor js = (JavascriptExecutor) localDriver;
 
             List<String> xpathList = new ArrayList<>();
             for (int i = 0;; i++) {
-                Object xpath = js.executeScript("let node = document.evaluate(\"//*[contains(text(), \\'Показать телефон\\')]\",\n" +
-                        "        document,\n" +
-                        "        null,\n" +
-                        "        XPathResult.FIRST_ORDERED_NODE_TYPE,\n" +
-                        "        null).singleNodeValue;\n" +
-                        "\n" +
-                        "if (node === null) return null;\n" +
-                        "node.textContent = \"scammed\";\n" +
-                        "let result = [];\n" +
-                        "function chose_by_nodeName(node_array, name) {\n" +
-                        "    let ans = [];\n" +
-                        "    for (let node of node_array) {\n" +
-                        "        if (node.nodeName === name) {\n" +
-                        "            ans.push(node);\n" +
-                        "        }\n" +
-                        "    }\n" +
-                        "    return ans;\n" +
-                        "}\n" +
-                        "function find_son(father, son) {\n" +
-                        "    const children = chose_by_nodeName(father.childNodes, son.nodeName);\n" +
-                        "    for (let i = 0; i < children.length; i++) {\n" +
-                        "        if (children[i] === son) {\n" +
-                        "            return i;\n" +
-                        "        }\n" +
-                        "    }\n" +
-                        "}\n" +
-                        "while (true) {\n" +
-                        "    if (node.nodeName === \"HTML\") {\n" +
-                        "        result.push(\"html\");\n" +
-                        "        break;\n" +
-                        "    }\n" +
-                        "    result.push(node.nodeName.toLowerCase());\n" +
-                        "    result[result.length - 1] = result[result.length - 1] + \"[\" + (find_son(node.parentNode, node) + 1) + \"]\";\n" +
-                        "    node = node.parentNode\n" +
-                        "}\n" +
-                        "return '/' + result.reverse().join(\"/\");");
+                var jsStream = Main.class.getResourceAsStream("/script.js");
+                var sc = new Scanner(jsStream).useDelimiter("\\A");
+
+                String jsScript = sc.next();
+                sc.close();
+                jsStream.close();
+
+                Object xpath = js.executeScript(jsScript);
 
                 if (xpath == null) {
                     break;
                 }
                 if (DEBUG) {
-                    System.out.println(xpath);
+                    System.err.println(xpath);
                 }
                 xpathList.add((String)xpath);
             }
@@ -178,24 +164,27 @@ public class Main {
             buttonsConst.add(driver.findElementByXPath(xpath));
         }
         var buttons = new ArrayList<WebElement>();
-        for (int i = 0; i < Math.min(buttonsConst.size(), numberOfHousings); i++) {
+        for (int i = 0; i < buttonsConst.size(); i++) {
             if (buttonsConst.get(i).isEnabled()) {
                 buttons.add(buttonsConst.get(i));
             }
         }
+        while (buttons.size() > numberOfHousings) {
+            buttons.remove(buttons.size() - 1);
+        }
         Collections.shuffle(buttons);
 
         Random random = new Random();
-        TimeUnit.MILLISECONDS.sleep(1000 + random.nextInt() % 500);
+        TimeUnit.MILLISECONDS.sleep(getDelay());
 
         for (var button : buttons) {
             try {
-                TimeUnit.MILLISECONDS.sleep(random.nextInt() % 2000 + 8000);
+                TimeUnit.MILLISECONDS.sleep(getDelay());
             } catch (Exception exc) {
 
             }
             action.moveToElement(button).perform();
-            TimeUnit.MILLISECONDS.sleep(1000 + random.nextInt() % 500);
+            TimeUnit.MILLISECONDS.sleep(getDelay());
             button.click();
         }
         // for product list (with phones!)
@@ -205,9 +194,9 @@ public class Main {
             urlsOfNumbersImages = getUrlsOfNumbersImages(driver.getPageSource(), bigNumberPrefix);
         }
 
-        TimeUnit.MILLISECONDS.sleep(1000 + random.nextInt() % 500);
+        TimeUnit.MILLISECONDS.sleep(getDelay());
         while (urlsOfNumbersImages.size() != buttons.size()) {
-            TimeUnit.MILLISECONDS.sleep(1000 + random.nextInt() % 500);
+            TimeUnit.MILLISECONDS.sleep(getDelay());
             urlsOfNumbersImages = getUrlsOfNumbersImages(driver.getPageSource(), listNumberPrefix);
             if (urlsOfNumbersImages.isEmpty()) {
                 urlsOfNumbersImages = getUrlsOfNumbersImages(driver.getPageSource(), bigNumberPrefix);
@@ -217,11 +206,11 @@ public class Main {
         for (String strUrl : urlsOfNumbersImages) {
             Image image = null;
             while (driver.getWindowHandles().size() != 1) {
-                TimeUnit.MILLISECONDS.sleep(1000 + random.nextInt() % 500);
+                TimeUnit.MILLISECONDS.sleep(getDelay());
             }
 
             imageDriver.get(strUrl);
-            TimeUnit.MILLISECONDS.sleep(5000 + random.nextInt() % 700);
+            TimeUnit.MILLISECONDS.sleep(getDelay());
             var number = imageDriver.findElementByXPath("//img");
 
             WrapsDriver wrapsDriver = (WrapsDriver) number;
@@ -232,17 +221,25 @@ public class Main {
             Point location = number.getLocation();
             BufferedImage bufferedImage = ImageIO.read(screenshot);
             bufferedImage = bufferedImage.getSubimage(location.x, location.y, width, height);
-            File outputfile = new File("number.png");
-            ImageIO.write(bufferedImage, "png", outputfile);
 
-            ProcessBuilder builder = new ProcessBuilder("bash", "-c", "tesseract ./number.png stdout 2>/dev/null\n");
-            builder.redirectErrorStream(true);
-            Process process = builder.start();
-            InputStream is = process.getInputStream();
-            BufferedReader reader = new BufferedReader(new InputStreamReader(is));
-            System.out.println(reader.readLine());
-            is.close();
-            reader.close();
+
+
+            File outputfile = new File("number.png");
+            try {
+                ImageIO.write(bufferedImage, "png", outputfile);
+                ProcessBuilder colorBinarization = new ProcessBuilder("bash", "-c", "convert number.png -threshold 0 number.png\n");
+                colorBinarization.start();
+                ProcessBuilder builder = new ProcessBuilder("bash", "-c", "tesseract ./number.png stdout 2>/dev/null\n");
+                builder.redirectErrorStream(true);
+                Process process = builder.start();
+                InputStream is = process.getInputStream();
+                BufferedReader reader = new BufferedReader(new InputStreamReader(is));
+                System.out.println(reader.readLine());
+                is.close();
+                reader.close();
+            } finally {
+                outputfile.deleteOnExit();
+            }
         }
     }
 
@@ -276,5 +273,10 @@ public class Main {
             }
         }
         return true;
+    }
+
+    private static int getDelay() {
+        Random rand = new Random();
+        return DELAY + Math.abs(rand.nextInt() % DELAY);
     }
 }

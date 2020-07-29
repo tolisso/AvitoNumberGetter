@@ -11,13 +11,14 @@ There is also a garbage in the stderr, so you can redirect it to
 
 ## Requirements
 
-You need tesseract to run this script.
-It can be installed with:
+You need tesseract and imagemagic to run this script.
+They can be installed with:
 
 `sudo apt install tesseract-ocr`
+`sudo apt install imagemagick-6.q16`
 or 
-
 `sudo apt-get install tesseract-ocr`
+`sudo apt-get install imagemagick-6.q16`
 
 Also you need to have **chrome** and **selenium plugin to chrome**.
 
