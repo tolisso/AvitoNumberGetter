@@ -34,9 +34,10 @@ They are locating in packages
 ## How to use
 
 Launch with arguments: 
-1) -link (link)
-2) -page (link) (numberOfLinks-opt)
-3) -pages (link) (numberOfPages)
+1) -phones -link (link)
+2) -phones -page (link) (numberOfLinks-opt)
+3) -phones -pages (link) (numberOfPages)
+3) -screenshot (link)
 
 (link) must point to
 1) housing page

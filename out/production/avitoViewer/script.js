@@ -1,10 +1,15 @@
-let node = document.evaluate("//button[contains(text(), \'Показать телефон\')]",
+//var text = "...
+
+let node = document.evaluate(text,
         document,
         null,
         XPathResult.FIRST_ORDERED_NODE_TYPE,
         null).singleNodeValue;
 
-if (node === null) return null;
+if (node === null) {
+    return null;
+}
+
 node.textContent = "scammed";
 let result = [];
 function chose_by_nodeName(node_array, name) {
