@@ -4,7 +4,6 @@ import org.openqa.selenium.chrome.*;
 import org.openqa.selenium.interactions.Actions;
 
 import javax.imageio.ImageIO;
-import java.awt.*;
 import java.awt.image.*;
 import java.io.*;
 import java.util.*;
@@ -14,7 +13,7 @@ import java.util.concurrent.TimeUnit;
 public class Main {
 
     private static final boolean DEBUG = false;
-    private static final int DELAY = 3_500; // ms
+    private static final int DELAY = 2_000; // ms
 
     private static Integer numberOfHousings = Integer.MAX_VALUE; //Integer.MAX_VALUE;
     private static Integer numberOfPages = 1; // - default value: DO NOT CHANGE
@@ -28,9 +27,9 @@ public class Main {
     private static final List<String> firstPhonesArg = List.of("-link", "-page", "-pages");
 
     private static final int height = 3500;
-    private static final int width = 1400;
+    private static final int width = 1000;
 
-    public static void main(String[] args) throws IOException, InterruptedException {
+    public static void main(String ... args) throws IOException, InterruptedException {
         if (args.length == 0) {
             System.err.println("too few arguments");
         } else if (args[0].equals("-phones")) {
@@ -120,8 +119,18 @@ public class Main {
     }
 
     private static void takeScreenshot(ChromeDriver driver, Actions action) throws IOException, InterruptedException {
+        if (driver.findElementsByXPath("//*[contains(text(), \'Объявление снято с публикации.\')]").size() != 0) {
+            throw new ClosedHousingException("closed advertisement");
+        }
+        if (driver.findElementsByXPath("//*[contains(text(), \'Сайт временно недоступен\')]").size() != 0) {
+            throw new UnavailableLinkException("link is temporary anavailable");
+        }
+        if (driver.findElementsByXPath("//*[contains(text(), \'Показать телефон\')]").size() > 3 ||
+                // Такой страницы на нашем сайте нет
+                driver.findElementsByXPath("//*[contains(text(), \'на нашем сайте нет\')]").size() != 0) {
+            throw new WrongLinkException("wrong link");
+        }
         var buttons = pressPhoneButtons(driver, action, "//*[contains(text(), \'Показать телефон\')]");
-        // wait until phones was loaded
 
         for (int i = 0; i < 4; i++) {
             try {
@@ -142,13 +151,13 @@ public class Main {
 
     private static List<String> parseButtonsXpath(String html, String pattern) throws IOException {
         File file = File.createTempFile("scammed", ".html");
+        FileWriter writer = new FileWriter(file);
         try {
-            FileWriter writer = new FileWriter(file);
             writer.write(html);
-            writer.close();
             return getPhoneButtonsXpathFromLocalSite(file, pattern);
         } finally {
             file.deleteOnExit();
+            writer.close();
         }
     }
 
@@ -220,7 +229,7 @@ public class Main {
                 TimeUnit.MILLISECONDS.sleep(getDelay());
                 button.click();
             } catch (Exception exc) {
-                System.out.println("button not clicked");
+                System.err.println("button not clicked");
             }
             // popup may be invoked
             var popUpsExits = driver.findElementsByXPath("//div[@class=\"close js-item-popup-close\"]");
@@ -286,15 +295,15 @@ public class Main {
         if (urlsOfNumbersImages.isEmpty()) {
             urlsOfNumbersImages = getBigPhoneUrls(driver);
         }
-        System.out.println(urlsOfNumbersImages.size() + " " + size);
+        //System.out.println(urlsOfNumbersImages.size() + " " + size);
         return urlsOfNumbersImages;
     }
 
     private static List<String> getBigPhoneUrls(ChromeDriver driver) {
         var elements = driver.findElementsByXPath(bigNumberXpath);
-        System.out.println(elements);
+        //System.out.println(elements);
         for (var element : elements) {
-            System.out.println(element.isDisplayed());
+            //System.out.println(element.isDisplayed());
             if (element.isDisplayed()) {
                 return getUrlsOfNumbersImages(element.getAttribute("innerHTML"), "");
             }
@@ -338,5 +347,23 @@ public class Main {
     private static int getDelay() {
         Random rand = new Random();
         return DELAY + Math.abs(rand.nextInt() % DELAY);
+    }
+}
+
+class ClosedHousingException extends RuntimeException {
+    ClosedHousingException(String str) {
+        super(str);
+    }
+}
+
+class WrongLinkException extends RuntimeException {
+    WrongLinkException(String str) {
+        super(str);
+    }
+}
+
+class UnavailableLinkException extends RuntimeException {
+    UnavailableLinkException(String str) {
+        super(str);
     }
 }
