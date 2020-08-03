@@ -13,7 +13,7 @@ import java.util.concurrent.TimeUnit;
 public class Main {
 
     private static final boolean DEBUG = false;
-    private static final int DELAY = 2_000; // ms
+    private static final int DELAY = 3_000; // ms
 
     private static Integer numberOfHousings = Integer.MAX_VALUE; //Integer.MAX_VALUE;
     private static Integer numberOfPages = 1; // - default value: DO NOT CHANGE

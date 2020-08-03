@@ -5,9 +5,11 @@ import org.apache.poi.ss.usermodel.Workbook;
 
 import javax.imageio.ImageIO;
 import java.awt.*;
+import java.awt.image.PixelGrabber;
 import java.io.File;
 import java.io.IOException;
 import java.net.URL;
+
 
 public class WhitePagesRemover {
     private Workbook wb;
@@ -40,8 +42,24 @@ public class WhitePagesRemover {
                 Image img = ImageIO.read(imgFile);
                 int width = img.getWidth(null);
                 int height = img.getHeight(null);
-            } catch (IOException exc) {
-
+                int[] pixels = new int[width * height];
+                PixelGrabber pg = new PixelGrabber(img, 0, 0, width, height, pixels, 0, width);
+                pg.grabPixels();
+                boolean isWhite = true;
+                for (int pixel : pixels) {
+                    Color color = new Color(pixel);
+                    if (color.getAlpha() == 0 || color.getRGB() != Color.WHITE.getRGB()) {
+                        isWhite = false;
+                        break;
+                    }
+                }
+                if (isWhite) {
+                    row.removeCell(pathCell);
+                    row.createCell(resultCol).setCellValue("ERROR");
+                    imgFile.delete();
+                }
+            } catch (IOException | InterruptedException exc) {
+                System.err.println("Problems with row " + i + ":\n" + exc);
             }
         }
     }
