@@ -3,7 +3,12 @@ import org.openqa.selenium.Point;
 import org.openqa.selenium.chrome.*;
 import org.openqa.selenium.interactions.Actions;
 
+import javax.imageio.IIOImage;
 import javax.imageio.ImageIO;
+import javax.imageio.ImageWriteParam;
+import javax.imageio.ImageWriter;
+import javax.imageio.stream.ImageOutputStream;
+import java.awt.*;
 import java.awt.image.*;
 import java.io.*;
 import java.util.*;
@@ -13,13 +18,12 @@ import java.util.concurrent.TimeUnit;
 public class Main {
 
     private static final boolean DEBUG = false;
-    private static final int DELAY = 3_000; // ms
+    private static final int DELAY = 1_000; // ms
 
     private static Integer numberOfHousings = Integer.MAX_VALUE; //Integer.MAX_VALUE;
     private static Integer numberOfPages = 1; // - default value: DO NOT CHANGE
     private static String inputUrl;
     private static String outputFileName;
-    private static String outputExtension;
 
     private static final String listNumberPrefix = "item-extended-phone";
     private static final String bigNumberXpath = "//div[@class='item-phone-big-number js-item-phone-big-number']";
@@ -28,6 +32,7 @@ public class Main {
 
     private static final int height = 3500;
     private static final int width = 1000;
+    private static final float quality = 0.3f;
 
     public static void main(String ... args) throws IOException, InterruptedException {
         if (args.length == 0) {
@@ -62,13 +67,12 @@ public class Main {
                 }
             }
         } else if (args[0].equals("-screenshot")) {
-            if (args.length != 4) {
+            if (args.length != 3) {
                 System.err.println("Wrong number of arguments with -screenshot");
                 return;
             }
             inputUrl = args[1];
             outputFileName = args[2];
-            outputExtension = args[3];
         } else {
             System.err.println("Wrong number format exception (arg1)");
             return;
@@ -110,18 +114,18 @@ public class Main {
             }
         } finally {
             if (!DEBUG) {
-                driver.close();
+                driver.quit();
                 if (args[0].equals("-phones")) {
-                    imageDriver.close();
+                    imageDriver.quit();
                 }
             }
         }
     }
 
     private static void takeScreenshot(ChromeDriver driver, Actions action) throws IOException, InterruptedException {
-        if (driver.findElementsByXPath("//*[contains(text(), \'Объявление снято с публикации.\')]").size() != 0) {
-            throw new ClosedHousingException("closed advertisement");
-        }
+//        if (driver.findElementsByXPath("//*[contains(text(), \'Объявление снято с публикации.\')]").size() != 0) {
+//            throw new ClosedHousingException("closed advertisement");
+//        }
         if (driver.findElementsByXPath("//*[contains(text(), \'Сайт временно недоступен\')]").size() != 0) {
             throw new UnavailableLinkException("link is temporary anavailable");
         }
@@ -130,34 +134,60 @@ public class Main {
                 driver.findElementsByXPath("//*[contains(text(), \'на нашем сайте нет\')]").size() != 0) {
             throw new WrongLinkException("wrong link");
         }
-        var buttons = pressPhoneButtons(driver, action, "//*[contains(text(), \'Показать телефон\')]");
+//        var buttons = pressPhoneButtons(driver, action, "//*[contains(text(), \'Показать телефон\')]");
 
-        for (int i = 0; i < 4; i++) {
-            try {
-                TimeUnit.MILLISECONDS.sleep(getDelay());
-                driver.findElementByXPath(exitFromBigNumberXpath).click();
-                TimeUnit.MILLISECONDS.sleep(getDelay());
-                break;
-            } catch (Exception exc) {
+//        for (int i = 0; i < 4; i++) {
+//            try {
+//                TimeUnit.MILLISECONDS.sleep(getDelay());
+//                driver.findElementByXPath(exitFromBigNumberXpath).click();
+//                TimeUnit.MILLISECONDS.sleep(getDelay());
+//                break;
+//            } catch (Exception exc) {
+//
+//            }
+//        }
+        TimeUnit.MILLISECONDS.sleep(getDelay());
 
-            }
-        }
+//        File screenshot = ((TakesScreenshot) driver).getScreenshotAs(OutputType.FILE);
+//        BufferedImage bufferedImage = ImageIO.read(screenshot);
+//        File outputFile = new File(outputFileName);
+//        ImageIO.write(bufferedImage, outputExtension, outputFile);
 
         File screenshot = ((TakesScreenshot) driver).getScreenshotAs(OutputType.FILE);
-        BufferedImage bufferedImage = ImageIO.read(screenshot);
-        File outputFile = new File(outputFileName);
-        ImageIO.write(bufferedImage, outputExtension, outputFile);
+        BufferedImage tmp = ImageIO.read(screenshot);
+        BufferedImage bufferedImage = new BufferedImage(tmp.getWidth(),
+                tmp.getHeight(),
+                BufferedImage.TYPE_INT_RGB);
+        bufferedImage.createGraphics().drawImage(tmp, 0, 0, Color.WHITE, null);
+
+        try(OutputStream os = new FileOutputStream(new File(outputFileName))) {
+
+            Iterator<ImageWriter> writers = ImageIO.getImageWritersByFormatName("jpg");
+            ImageWriter writer = writers.next();
+            try (ImageOutputStream ios = ImageIO.createImageOutputStream(os)) {
+                writer.setOutput(ios);
+                try {
+                    ImageWriteParam param = writer.getDefaultWriteParam();
+
+                    param.setCompressionMode(ImageWriteParam.MODE_EXPLICIT);
+                    param.setCompressionQuality(quality);  // Change the quality value you prefer
+                    writer.write(null, new IIOImage(bufferedImage, null, null), param);
+                } finally {
+                    writer.dispose();
+                }
+            }
+        }
     }
 
     private static List<String> parseButtonsXpath(String html, String pattern) throws IOException {
         File file = File.createTempFile("scammed", ".html");
-        FileWriter writer = new FileWriter(file);
-        try {
-            writer.write(html);
-            return getPhoneButtonsXpathFromLocalSite(file, pattern);
-        } finally {
-            file.deleteOnExit();
-            writer.close();
+        try (FileWriter writer = new FileWriter(file)) {
+            try {
+                writer.write(html);
+                return getPhoneButtonsXpathFromLocalSite(file, pattern);
+            } finally {
+                file.deleteOnExit();
+            }
         }
     }
 
@@ -176,27 +206,26 @@ public class Main {
 
             List<String> xpathList = new ArrayList<>();
             for (int i = 0;; i++) {
-                var jsStream = Main.class.getResourceAsStream("/script.js");
-                var sc = new Scanner(jsStream).useDelimiter("\\A");
+                try(var jsStream = Main.class.getResourceAsStream("/script.js");
+                    var sc = new Scanner(jsStream).useDelimiter("\\A")) {
 
-                String jsScript = sc.next();
-                sc.close();
-                jsStream.close();
+                    String jsScript = sc.next();
 
-                Object xpath = js.executeScript("var text = \"" + pattern + "\"; " + jsScript);
+                    Object xpath = js.executeScript("var text = \"" + pattern + "\"; " + jsScript);
 
-                if (xpath == null) {
-                    break;
+                    if (xpath == null) {
+                        break;
+                    }
+                    if (DEBUG) {
+                        System.err.println(xpath);
+                    }
+                    xpathList.add((String) xpath);
                 }
-                if (DEBUG) {
-                    System.err.println(xpath);
-                }
-                xpathList.add((String)xpath);
             }
             return xpathList;
         } finally {
             if (!DEBUG) {
-                localDriver.close();
+                localDriver.quit();
             }
         }
     }
@@ -276,11 +305,11 @@ public class Main {
                 ProcessBuilder builder = new ProcessBuilder("bash", "-c", "tesseract ./number.png stdout 2>/dev/null\n");
                 builder.redirectErrorStream(true);
                 Process process = builder.start();
-                InputStream is = process.getInputStream();
-                BufferedReader reader = new BufferedReader(new InputStreamReader(is));
-                System.out.println(reader.readLine());
-                is.close();
-                reader.close();
+                try (InputStream is = process.getInputStream()) {
+                    try (BufferedReader reader = new BufferedReader(new InputStreamReader(is))) {
+                        System.out.println(reader.readLine());
+                    }
+                }
             } finally {
                 outputfile.deleteOnExit();
             }
@@ -319,7 +348,6 @@ public class Main {
                     continue outer;
                 }
             }
-            int openParenthesis = 0;
             int start = i + imgClass.length();
             final String urlPref = "src=\"";
             while (!checkSubstr(source, urlPref, start)) {
